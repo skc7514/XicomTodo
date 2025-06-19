@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   Image,
+  Dimensions,
   Alert,
   StyleSheet,
   TextInput,
@@ -10,24 +11,37 @@ import {
   ScrollView,
   StatusBar,
   SafeAreaView,
-  Platform
+  Platform,
+  ActivityIndicator
 } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useRoute } from '@react-navigation/native';
 import Header from '../components/Header';
 import comman from '../styles/CommanStyles';
 import Colors from '../constants/Colors';
-import { postData } from '../services/apiService'; 
+
 
 const ImageDetailScreen = () => {
   const route = useRoute();
   const { id, user_image } = route.params;
-
+  const [imageHeight, setImageHeight] = useState(100);
+ 
   const [first_name, setFirstName] = useState('');
   const [last_name, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [formErrors, setFormErrors] = useState({});
+  const [isSubmit, setIsSubmit] = useState(false);
+
+
+  useEffect(() => {
+    Image.getSize(user_image, (width, height) => {
+      const screenWidth = Dimensions.get('window').width;
+      const scaleFactor = width / screenWidth;
+      const imageHeight = height / scaleFactor;
+      setImageHeight(imageHeight);
+    });
+  }, [user_image]);
 
   const validateAndSubmit = async () => {
     const errors: any = {};
@@ -57,21 +71,32 @@ const ImageDetailScreen = () => {
     }
 
     setFormErrors(errors);
+
     if (Object.keys(errors).length === 0) {
-        const payload = {
-          id,
-          user_image,
-          first_name,
-          last_name,
-          email,
-          phone,
-        };
-        Alert.alert('Success', JSON.stringify(payload));
+      setIsSubmit(true);
+      const formData = new FormData();
+      formData.append('first_name', first_name);
+      formData.append('last_name', last_name);
+      formData.append('email', email);
+      formData.append('phone', phone);
+      formData.append('user_image', {
+        uri: user_image,
+        name: 'user_image.jpg',
+        type: 'image/jpeg',
+      });
+
+
       try {
-        const response = await postData('/savedata.php', payload);
-        console.log('API Response:', JSON.stringify(response));
-        if (response.status === 'success') {
-        Alert.alert('Success', 'Form submitted successfully!');
+        const response = await fetch('http://dev3.xicomtechnologies.com/xttest/savedata.php', {
+          method: 'POST',
+          body: formData,
+        });
+  
+        const result = await response.json();
+        console.log('API Response:', result);
+  
+        if (result.status === 'success') {
+          Alert.alert('Success', 'Form submitted successfully!');
           setFirstName('');
           setLastName('');
           setEmail('');
@@ -81,11 +106,14 @@ const ImageDetailScreen = () => {
           Alert.alert('Error', 'Submission failed.');
         }
       } catch (error) {
-        Alert.alert('API Error:', JSON.stringify(error));
+        Alert.alert('API Error', JSON.stringify(error));
         console.error('API Error:', error);
+      } finally {
+        setIsSubmit(false); 
       }
     }
-  };
+  
+  }
 
 return (
     <SafeAreaView style={comman.container}>
@@ -94,10 +122,10 @@ return (
         contentContainerStyle={styles.scrollViewContainer}
         enableOnAndroid
         extraScrollHeight={20}
-        keyboardShouldPersistTaps="handled"
-      >
+        keyboardShouldPersistTaps="handled">
+
         <Header title="Detail Screen" showBackButton={true} />
-        <Image source={{ uri: user_image }} style={styles.image} />
+        <Image source={{ uri: user_image }} style={{ width: '100%', height: imageHeight, resizeMode: 'contain' }} />
 
         <View style={styles.cardContainer}>
           <View style={styles.formGroupRow}>
@@ -147,8 +175,15 @@ return (
           {formErrors.phone && <Text style={styles.errorText}>{formErrors.phone}</Text>}
 
           <View style={{ alignItems: 'flex-end' }}>
-            <TouchableOpacity style={styles.button} onPress={validateAndSubmit}>
-              <Text style={styles.buttonText}>Submit</Text>
+            <TouchableOpacity
+              style={[styles.button, isSubmit && { opacity: 0.6 }]}
+              onPress={validateAndSubmit}
+              disabled={isSubmit}>
+              {isSubmit ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>Submit</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -170,11 +205,6 @@ const styles = StyleSheet.create({
   cardContainer: {
     padding: 20,
     paddingTop: 20,
-  },
-  image: {
-    width: '100%',
-    height: 250,
-    resizeMode: 'cover',
   },
   formGroupRow: {
     flexDirection: 'row',

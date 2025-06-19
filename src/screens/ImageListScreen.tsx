@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
   SafeAreaView,
 } from 'react-native';
-import { postData } from '../services/apiService';
+// import { postData } from '../services/apiService';
 import { useNavigation } from '@react-navigation/native';
 import comman from '../styles/CommanStyles';
 import Header from '../components/Header';
@@ -27,29 +27,36 @@ const ImageListScreen = () => {
 
   const fetchImages = async (offset: number) => {
     setLoading(true);
-    const payload = {
-      user_id: 108,
-      offset: offset,
-      type: 'popular',
-    };
+    const formData = new FormData();
+
+    formData.append('user_id', 108);
+    formData.append('offset', offset);
+    formData.append('type', 'popular');
 
     try {
-      const response = await postData('/getdata.php', payload);
-      console.log('Response:', response);
-      if (response.status === 'success') {
-        const newImages = response.images;
+      const response = await fetch('http://dev3.xicomtechnologies.com/xttest/getdata.php', {
+        method: 'POST',
+        body: formData,
+      });
+  
+      const result = await response.json();
+      console.log('Response:', result);
+      if (result.status === 'success') {
+        const newImages = result.images || [];
         if (newImages.length === 0) {
           setHasMore(false);
           Alert.alert('No more images', 'There are no more images to show.');
         } else {
           setImages((prevImages) => [...prevImages, ...newImages]);
         }
+      } else {
+       Alert.alert('Error', result.message || 'Failed to fetch images.');
       }
     } catch (error) {
-      Alert.alert('Error', 'There was an error fetching the images.');
-      console.error('Error:', error);
+      console.error('API Error:', error);
+      Alert.alert('Error', error.message);
     } finally {
-      setLoading(false);
+       setLoading(false);
     }
   };
 
@@ -98,12 +105,12 @@ const ImageListScreen = () => {
     return (
       <TouchableOpacity onPress={() => handleImagePress(item)} activeOpacity={0.8}>
         <View style={styles.imageContainer}>
-          <View style={{position: 'absolute', bottom: 2, left: 2, zIndex: 1}}>
+          <View style={{position: 'absolute', bottom: 2, left: 4, zIndex: 1}}>
             <Text style={{color: '#333'}}>{item.id}</Text>
           </View>
           <Image
             source={{ uri: item.xt_image }}
-            style={[styles.image, { height: item.height }]}
+            style={{ width: '100%', height: item.height, resizeMode: 'contain' }}
           />
         </View>
       </TouchableOpacity>
@@ -152,11 +159,6 @@ const styles = StyleSheet.create({
     borderColor: '#d3d3d3',
     marginHorizontal: 10,
     marginVertical: 10,
-  },
-  image: {
-    width: '100%',
-    borderRadius: 10,
-    resizeMode: 'cover',
   },
   loadMoreButton: {
     paddingVertical: 15,
